@@ -1,0 +1,39 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ragpipeline
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        enabled: true
+        options:
+          model: qwen2.5:1.5b
+          temperature: 0.3
+      embedding:
+        enabled: true
+        options:
+          model: nomic-embed-text:latest
+
+rag:
+  chunking:
+    default-chunk-size: 500
+    default-chunk-overlap: 100
+    min-chunk-size-chars: 50
+  retrieval:
+    default-top-k: 4
+    default-similarity-threshold: 0.55
+  storage:
+    upload-dir: data/uploads
+    vector-store-file: data/vectors/vector_store.json
+
+logging:
+  level:
+    com.example.ragpipeline: INFO
+    org.springframework.ai: INFO

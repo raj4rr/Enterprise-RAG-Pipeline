@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Enterprise RAG Pipeline built with Spring AI, Java 25, Ollama and Vector Store">
+    <title>Spring AI RAG Pipeline | Java 25 Enterprise</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-container">
+            <div class="logo-group">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">
+                    <h1>Spring AI RAG Pipeline</h1>
+                    <p>Document Ingestion • Overlapping Chunker • Vector Search • LLM Chat</p>
+                </div>
+            </div>
+
+            <div class="header-badges">
+                <div class="badge success" id="statusBadge">
+                    <span class="pulse-dot"></span> Java 25
+                </div>
+                <div class="badge purple">
+                    🍃 Spring AI 1.0.0
+                </div>
+                <div class="badge cyan">
+                    🧠 nomic-embed-text
+                </div>
+                <div class="badge" id="headerDocCount">
+                    0 files
+                </div>
+                <div class="badge" id="headerChunkCount">
+                    0 chunks
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main>
+        <!-- Nav Tabs -->
+        <nav class="tabs-nav" aria-label="Pipeline Steps">
+            <button class="tab-btn active" data-tab="tab-ingest" id="tabBtnIngest">
+                <span>📁</span> Document Ingestion & Chunks
+            </button>
+            <button class="tab-btn" data-tab="tab-vectordb" id="tabBtnVectorDb">
+                <span>🔍</span> Vector DB & Search
+            </button>
+            <button class="tab-btn" data-tab="tab-chat" id="tabBtnChat">
+                <span>💬</span> RAG AI Chatbot
+            </button>
+        </nav>
+
+        <!-- TAB 1: Ingestion & Chunker -->
+        <section class="tab-content active" id="tab-ingest">
+            <div class="grid-2">
+                <!-- Left Column: Input and Parameters -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title"><span>📥</span> Document Ingestion</h2>
+                            <p class="card-subtitle">Upload documents (PDF, DOCX, TXT, MD, CSV) or enter raw text</p>
+                        </div>
+                    </div>
+
+                    <!-- File Dropzone -->
+                    <div class="form-group">
+                        <label class="form-label">Upload File</label>
+                        <div class="dropzone" id="dropzone">
+                            <span class="dropzone-icon">📄</span>
+                            <div class="dropzone-title">Drag & drop your file here, or click to browse</div>
+                            <div class="dropzone-desc">Supports PDF, DOCX, Markdown, Text, HTML, CSV (Up to 50MB)</div>
+                            <input type="file" id="fileInput" style="display: none;" accept=".pdf,.docx,.txt,.md,.html,.csv,.json">
+                            <div class="file-pill" id="selectedFileDisplay" style="display: none;">
+                                <span>📎</span> <span id="selectedFileName">file.txt</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Raw Text Area -->
+                    <div class="form-group">
+                        <label class="form-label">Or Paste Text Directly</label>
+                        <textarea id="rawTextInput" rows="4" placeholder="Paste custom document text, articles, policies, or notes here..."></textarea>
+                    </div>
+
+                    <!-- Chunk Size Slider -->
+                    <div class="form-group">
+                        <label class="form-label" for="chunkSize">
+                            <span>Chunk Size (characters)</span>
+                            <span class="slider-val" id="chunkSizeVal">500</span>
+                        </label>
+                        <input type="range" id="chunkSize" min="100" max="2000" step="50" value="500">
+                    </div>
+
+                    <!-- Overlap Slider -->
+                    <div class="form-group">
+                        <label class="form-label" for="chunkOverlap">
+                            <span>Chunk Overlap (characters)</span>
+                            <span class="slider-val" id="chunkOverlapVal">100</span>
+                        </label>
+                        <input type="range" id="chunkOverlap" min="0" max="500" step="25" value="100">
+                        <small style="color: var(--text-dim); font-size: 0.75rem;">
+                            Overlap preserves continuous context across chunk splits, preventing information loss.
+                        </small>
+                    </div>
+
+                    <!-- Status Banner -->
+                    <div id="ingestStatusBanner" class="status-banner" style="display: none;"></div>
+
+                    <!-- Action Buttons -->
+                    <div style="display: flex; gap: 12px; margin-top: 8px;">
+                        <button type="button" class="btn btn-secondary" id="btnPreview" style="flex: 1;">
+                            👁️ Preview Chunks
+                        </button>
+                        <button type="button" class="btn" id="btnIngest" style="flex: 1.5;">
+                            ⚡ Ingest & Save to Vector DB
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Column: Chunks Preview -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title"><span>✂️</span> Chunk Visualizer</h2>
+                            <p class="card-subtitle">Real-time inspection of split chunks and boundary preservation</p>
+                        </div>
+                        <span class="badge purple" id="previewCountBadge" style="display: none;">0 chunks</span>
+                    </div>
+
+                    <div class="chunks-container" id="previewContainer">
+                        <div style="text-align: center; color: var(--text-dim); padding: 60px 20px;">
+                            <span style="font-size: 32px; display: block; margin-bottom: 10px;">🔍</span>
+                            Upload a file or enter text, then click <strong>"Preview Chunks"</strong> or <strong>"Ingest & Save"</strong> to visualize how the document is split with overlapping.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: Vector DB Explorer -->
+        <section class="tab-content" id="tab-vectordb">
+            <div class="grid-2">
+                <!-- Left: Vector DB Search Tester -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title"><span>🎯</span> Vector Similarity Search Test</h2>
+                            <p class="card-subtitle">Test semantic retrieval against stored document embeddings</p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Search Query</label>
+                        <input type="text" id="searchQuery" placeholder="e.g., What are the terms of the agreement?">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Top-K Results: <span class="slider-val" id="searchTopKVal">4</span></label>
+                        <input type="range" id="searchTopK" min="1" max="10" value="4" oninput="document.getElementById('searchTopKVal').textContent = this.value">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Similarity Threshold: <span class="slider-val" id="searchThresholdVal">0.50</span></label>
+                        <input type="range" id="searchThreshold" min="0.10" max="0.95" step="0.05" value="0.50" oninput="document.getElementById('searchThresholdVal').textContent = this.value">
+                    </div>
+
+                    <button class="btn" id="btnSearchTest">Run Vector Search</button>
+
+                    <div class="chunks-container" id="searchResultsContainer" style="margin-top: 12px; max-height: 280px;">
+                        <div style="color: var(--text-dim); font-size: 0.85rem;">Matching vector chunks will appear here.</div>
+                    </div>
+                </div>
+
+                <!-- Right: Database Overview & Management -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title"><span>📊</span> Vector DB Overview</h2>
+                            <p class="card-subtitle">Local persistent storage and indexed documents</p>
+                        </div>
+                        <button class="btn btn-danger" id="btnResetVector" style="padding: 6px 12px; font-size: 0.8rem;">
+                            🗑️ Reset Store
+                        </button>
+                    </div>
+
+                    <div>
+                        <h4 style="font-size: 0.88rem; margin-bottom: 8px; color: var(--text-muted);">Indexed Files:</h4>
+                        <ul id="storedDocsList" style="list-style: none; font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
+                            <li style="color: var(--text-dim);">Loading...</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: rgba(10, 13, 20, 0.4); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 6px;">
+                        <div><strong>Embedding Model:</strong> <span style="color: var(--accent-cyan);">nomic-embed-text (Ollama)</span></div>
+                        <div><strong>Chat Model:</strong> <span style="color: var(--accent-emerald);">qwen2.5:1.5b (Ollama)</span></div>
+                        <div><strong>Persistence:</strong> <span style="color: var(--text-muted);">data/vectors/vector_store.json</span></div>
+                        <div><strong>Architecture:</strong> <span style="color: var(--text-muted);">In-Memory + JSON Disk Backup (SimpleVectorStore)</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: Chatbot -->
+        <section class="tab-content" id="tab-chat">
+            <div class="chat-window">
+                <div class="chat-header">
+                    <div>
+                        <h2 style="font-size: 1rem; font-weight: 700;">🤖 RAG Conversational Assistant</h2>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Powered by Spring AI & Local LLM</span>
+                    </div>
+                    <div class="badge success">
+                        <span>●</span> Connected to Ollama
+                    </div>
+                </div>
+
+                <!-- Message stream -->
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message assistant">
+                        <div class="avatar assistant">🤖</div>
+                        <div class="bubble">
+                            <div class="message-content">
+                                Hello! I am your Spring AI RAG Assistant. Upload your documents in the <strong>Ingestion</strong> tab, and ask me any questions. I will search the vector database for relevant chunks and formulate grounded answers with verified citations!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prompt suggestion pills -->
+                <div class="prompt-pills">
+                    <button class="pill-btn">Summarize the uploaded document</button>
+                    <button class="pill-btn">What are the primary key takeaways?</button>
+                    <button class="pill-btn">List key technical specifications</button>
+                </div>
+
+                <!-- Input area -->
+                <div class="chat-input-area">
+                    <textarea class="chat-input" id="chatInput" placeholder="Ask a question about your ingested documents..." rows="1"></textarea>
+                    <button class="btn" id="btnSendMessage" style="padding: 0 20px;">
+                        <span>Send</span> ➔
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
