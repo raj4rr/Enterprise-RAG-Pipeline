@@ -438,6 +438,27 @@ textarea:focus, input[type="text"]:focus, select:focus {
   background: rgba(244, 63, 94, 0.25);
 }
 
+.btn-icon-danger {
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: var(--accent-rose);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.btn-icon-danger:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.3);
+  border-color: rgba(244, 63, 94, 0.5);
+  transform: scale(1.05);
+}
+
 /* Chunks Preview Box */
 .chunks-container {
   display: flex;

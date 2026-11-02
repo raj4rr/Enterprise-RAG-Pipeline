@@ -432,22 +432,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const docsRes = await fetch('/api/rag/documents');
             const docsData = await docsRes.json();
+            const docsList = Array.isArray(docsData) ? docsData : (docsData.files || []);
 
             if (docCountBadge) {
-                docCountBadge.textContent = `${docsData.totalFiles} files`;
+                docCountBadge.textContent = `${docsList.length} files`;
             }
 
             const storedDocsList = document.getElementById('storedDocsList');
             if (storedDocsList) {
                 storedDocsList.innerHTML = '';
-                if (docsData.files.length === 0) {
-                    storedDocsList.innerHTML = '<li style="color: var(--text-dim);">No documents uploaded yet.</li>';
+                if (docsList.length === 0) {
+                    storedDocsList.innerHTML = '<li style="color: var(--text-dim); padding: 12px 0;">No documents uploaded yet.</li>';
                 } else {
-                    docsData.files.forEach(f => {
+                    docsList.forEach(doc => {
+                        const name = typeof doc === 'string' ? doc : doc.filename;
+                        const chunks = doc.chunkCount !== undefined ? doc.chunkCount : '-';
+                        const size = doc.fileSizeBytes && doc.fileSizeBytes > 0 ? ` • ${formatBytes(doc.fileSizeBytes)}` : '';
+
                         const li = document.createElement('li');
-                        li.style.padding = '6px 0';
-                        li.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-                        li.textContent = '📄 ' + f;
+                        li.style.display = 'flex';
+                        li.style.justifyContent = 'space-between';
+                        li.style.alignItems = 'center';
+                        li.style.padding = '8px 0';
+                        li.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
+                        li.style.gap = '8px';
+
+                        const infoDiv = document.createElement('div');
+                        infoDiv.style.overflow = 'hidden';
+                        infoDiv.style.textOverflow = 'ellipsis';
+                        infoDiv.style.whiteSpace = 'nowrap';
+                        infoDiv.innerHTML = `<span>📄 <strong>${escapeHtml(name)}</strong></span> <span style="color: var(--text-dim); font-size: 0.75rem; margin-left: 6px;">(${chunks} chunks${size})</span>`;
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.innerHTML = '🗑️ Delete';
+                        deleteBtn.title = `Delete ${name} and its vectors`;
+                        deleteBtn.className = 'btn-icon-danger';
+                        deleteBtn.onclick = async (e) => {
+                            e.stopPropagation();
+                            if (confirm(`Delete '${name}' and remove its chunks from the vector database?`)) {
+                                try {
+                                    deleteBtn.disabled = true;
+                                    deleteBtn.textContent = 'Deleting...';
+                                    const delRes = await fetch(`/api/rag/documents/${encodeURIComponent(name)}`, { method: 'DELETE' });
+                                    const delJson = await delRes.json();
+                                    await loadStatusAndDocuments();
+                                } catch (err) {
+                                    alert(`Failed to delete document: ${err.message}`);
+                                }
+                            }
+                        };
+
+                        li.appendChild(infoDiv);
+                        li.appendChild(deleteBtn);
                         storedDocsList.appendChild(li);
                     });
                 }

@@ -99,6 +99,44 @@ public class FileStorageService {
         }
     }
 
+    /**
+     * Deletes a stored file from the upload directory.
+     */
+    public boolean deleteStoredFile(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return false;
+        }
+        try {
+            Path target = this.uploadDir.resolve(filename).normalize();
+            if (target.startsWith(this.uploadDir) && Files.exists(target)) {
+                boolean deleted = Files.deleteIfExists(target);
+                log.info("Deleted stored file from disk: {} (success: {})", target, deleted);
+                return deleted;
+            }
+        } catch (IOException e) {
+            log.error("Failed to delete stored file {}: {}", filename, e.getMessage(), e);
+        }
+        return false;
+    }
+
+    /**
+     * Returns file size in bytes if file exists on disk.
+     */
+    public long getFileSize(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return 0L;
+        }
+        try {
+            Path target = this.uploadDir.resolve(filename).normalize();
+            if (target.startsWith(this.uploadDir) && Files.exists(target)) {
+                return Files.size(target);
+            }
+        } catch (IOException e) {
+            log.warn("Could not determine size for file {}: {}", filename, e.getMessage());
+        }
+        return 0L;
+    }
+
     public record StoredFileResult(
             Path savedPath,
             String originalFilename,

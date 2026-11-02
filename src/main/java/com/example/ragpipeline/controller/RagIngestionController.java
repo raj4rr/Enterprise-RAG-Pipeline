@@ -159,19 +159,34 @@ public class RagIngestionController {
     }
 
     /**
-     * Returns a list of all stored files.
+     * Returns a detailed list of all ingested documents and their chunk counts.
      */
     @GetMapping("/documents")
-    public ResponseEntity<Map<String, Object>> getDocuments() {
-        List<String> files = fileStorageService.listStoredFiles();
+    public ResponseEntity<List<DocumentInfo>> getDocuments() {
+        List<DocumentInfo> docs = vectorStoreService.listDocuments(fileStorageService);
+        return ResponseEntity.ok(docs);
+    }
+
+    /**
+     * Deletes a specific document from disk and removes its chunks from the vector database.
+     */
+    @DeleteMapping("/documents/{filename}")
+    public ResponseEntity<Map<String, Object>> deleteDocument(@PathVariable("filename") String filename) {
+        log.info("Request to delete document: {}", filename);
+        int deletedChunks = vectorStoreService.deleteDocument(filename);
+        boolean fileDeleted = fileStorageService.deleteStoredFile(filename);
+
         return ResponseEntity.ok(Map.of(
-                "totalFiles", files.size(),
-                "files", files
+                "success", true,
+                "filename", filename,
+                "deletedChunks", deletedChunks,
+                "fileDeleted", fileDeleted,
+                "message", String.format("Successfully deleted '%s' (%d chunks removed from vector store).", filename, deletedChunks)
         ));
     }
 
     /**
-     * Clears the vector store.
+     * Clears the entire vector store and uploaded files.
      */
     @DeleteMapping("/reset")
     public ResponseEntity<Map<String, String>> resetVectorStore() {

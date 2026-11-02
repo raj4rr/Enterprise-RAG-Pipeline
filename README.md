@@ -434,7 +434,53 @@ curl http://localhost:8080/api/rag/status
 
 ---
 
-### 7. Reset Vector Store
+### 7. List Ingested Documents
+Returns a detailed list of all indexed documents, their chunk counts, file sizes, and upload timestamps.
+
+- **URL**: `GET /api/rag/documents`
+
+```bash
+curl http://localhost:8080/api/rag/documents
+```
+
+**Response (`200 OK`)**:
+```json
+[
+  {
+    "filename": "spring_ai_architecture.md",
+    "chunkCount": 11,
+    "fileSizeBytes": 4210,
+    "uploadedAt": "2026-10-29T19:18:44.009719Z",
+    "contentType": "text/markdown"
+  }
+]
+```
+
+---
+
+### 8. Delete Specific Document
+Deletes an individual document from disk and removes all its corresponding chunks from the vector database.
+
+- **URL**: `DELETE /api/rag/documents/{filename}`
+
+```bash
+curl -X DELETE http://localhost:8080/api/rag/documents/spring_ai_architecture.md
+```
+
+**Response (`200 OK`)**:
+```json
+{
+  "success": true,
+  "filename": "spring_ai_architecture.md",
+  "deletedChunks": 11,
+  "fileDeleted": true,
+  "message": "Successfully deleted 'spring_ai_architecture.md' (11 chunks removed from vector store)."
+}
+```
+
+---
+
+### 9. Reset Vector Store
 Clears the vector store from memory, deletes the persisted `vector_store.json` file, and clears uploaded files.
 
 - **URL**: `DELETE /api/rag/reset`
@@ -522,7 +568,20 @@ export JAVA_HOME="/Users/rajesh/Library/Java/JavaVirtualMachines/loom-ea-25-loom
 
 Expected result:
 ```
+[INFO] Running com.example.ragpipeline.VectorStoreServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
 [INFO] Running com.example.ragpipeline.OverlappingTextSplitterTest
 [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
+
+---
+
+## 🤝 Contributing & Community
+
+We welcome contributions from everyone! Whether you want to add new embedding providers, implement streaming responses, improve the UI, or write benchmark tests:
+
+- Read our **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup instructions, coding conventions, and PR guidelines.
+- Explore **[Good First Issues](https://github.com/your-username/ragpipeline/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** for beginner-friendly tasks.
+- All Pull Requests are automatically built and tested against Java 25 via **GitHub Actions CI** (`.github/workflows/ci.yml`).
+
