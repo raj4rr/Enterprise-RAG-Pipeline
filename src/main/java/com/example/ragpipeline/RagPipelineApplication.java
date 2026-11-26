@@ -7,6 +7,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 
 @SpringBootApplication
 @ConfigurationPropertiesScan
@@ -19,12 +20,13 @@ public class RagPipelineApplication {
     }
 
     @Bean
-    public CommandLineRunner startupInfo() {
+    public CommandLineRunner startupInfo(Environment env) {
         return args -> {
+            String port = env.getProperty("server.port", "8080");
             log.info("=================================================================");
             log.info("🚀 Spring AI RAG Pipeline started successfully on Java {}", Runtime.version());
-            log.info("📂 UI Dashboard: http://localhost:8080");
-            log.info("📖 API Endpoints: http://localhost:8080/api/rag/status");
+            log.info("📂 UI Dashboard: http://localhost:{}", port);
+            log.info("📖 API Endpoints: http://localhost:{}/api/rag/status", port);
             log.info("=================================================================");
         };
     }

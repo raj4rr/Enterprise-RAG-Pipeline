@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
@@ -36,6 +37,7 @@ public class VectorStoreService {
     private final Map<String, String> sourceUploadedAt = new ConcurrentHashMap<>();
     private final Map<String, String> sourceContentType = new ConcurrentHashMap<>();
 
+    @Autowired
     public VectorStoreService(SimpleVectorStore vectorStore,
                               RagProperties ragProperties,
                               HybridSearchService hybridSearchService,

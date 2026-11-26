@@ -1,6 +1,7 @@
 package com.example.ragpipeline.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 @ConfigurationProperties(prefix = "rag")
 public record RagProperties(
@@ -11,16 +12,24 @@ public record RagProperties(
         Grounding grounding,
         Storage storage
 ) {
-    public RagProperties {
-        if (quality == null) quality = new Quality(true, 0.40, true);
-        if (chunking == null) chunking = new Chunking(500, 100, 50, "SENTENCE_AWARE");
-        if (embedding == null) embedding = new Embedding("nomic-embed-text:latest", true, "search_query: ", "search_document: ");
-        if (retrieval == null) retrieval = new Retrieval(4, 0.55, 0.50,
+    @ConstructorBinding
+    public RagProperties(
+            Quality quality,
+            Chunking chunking,
+            Embedding embedding,
+            Retrieval retrieval,
+            Grounding grounding,
+            Storage storage
+    ) {
+        this.quality = (quality != null) ? quality : new Quality(true, 0.40, true);
+        this.chunking = (chunking != null) ? chunking : new Chunking(500, 100, 50, "SENTENCE_AWARE");
+        this.embedding = (embedding != null) ? embedding : new Embedding("nomic-embed-text:latest", true, "search_query: ", "search_document: ");
+        this.retrieval = (retrieval != null) ? retrieval : new Retrieval(4, 0.55, 0.50,
                 new HybridSearch(true, 0.65, 0.35, 60),
                 new Reranking(true, 8, 0.30));
-        if (grounding == null) grounding = new Grounding(true, true,
+        this.grounding = (grounding != null) ? grounding : new Grounding(true, true,
                 "I am unable to answer based on the provided documents because the information is not present in the retrieved context.");
-        if (storage == null) storage = new Storage("data/uploads", "data/vectors/vector_store.json");
+        this.storage = (storage != null) ? storage : new Storage("data/uploads", "data/vectors/vector_store.json");
     }
 
     public record Quality(
@@ -39,11 +48,12 @@ public record RagProperties(
             int minChunkSizeChars,
             String strategy
     ) {
-        public Chunking {
-            if (defaultChunkSize <= 0) defaultChunkSize = 500;
-            if (defaultChunkOverlap < 0) defaultChunkOverlap = 100;
-            if (minChunkSizeChars <= 0) minChunkSizeChars = 50;
-            if (strategy == null || strategy.isBlank()) strategy = "SENTENCE_AWARE";
+        @ConstructorBinding
+        public Chunking(int defaultChunkSize, int defaultChunkOverlap, int minChunkSizeChars, String strategy) {
+            this.defaultChunkSize = (defaultChunkSize > 0) ? defaultChunkSize : 500;
+            this.defaultChunkOverlap = (defaultChunkOverlap >= 0) ? defaultChunkOverlap : 100;
+            this.minChunkSizeChars = (minChunkSizeChars > 0) ? minChunkSizeChars : 50;
+            this.strategy = (strategy != null && !strategy.isBlank()) ? strategy : "SENTENCE_AWARE";
         }
 
         public Chunking(int defaultChunkSize, int defaultChunkOverlap, int minChunkSizeChars) {
@@ -95,15 +105,21 @@ public record RagProperties(
             HybridSearch hybridSearch,
             Reranking reranking
     ) {
-        public Retrieval {
-            if (defaultTopK <= 0) defaultTopK = 4;
-            if (defaultSimilarityThreshold <= 0.0) defaultSimilarityThreshold = 0.55;
-            if (minConfidenceThreshold <= 0.0) minConfidenceThreshold = 0.50;
-            if (hybridSearch == null) hybridSearch = new HybridSearch(true, 0.65, 0.35, 60);
-            if (reranking == null) reranking = new Reranking(true, 8, 0.30);
+        @ConstructorBinding
+        public Retrieval(
+                int defaultTopK,
+                double defaultSimilarityThreshold,
+                double minConfidenceThreshold,
+                HybridSearch hybridSearch,
+                Reranking reranking
+        ) {
+            this.defaultTopK = (defaultTopK > 0) ? defaultTopK : 4;
+            this.defaultSimilarityThreshold = (defaultSimilarityThreshold >= 0.0) ? defaultSimilarityThreshold : 0.55;
+            this.minConfidenceThreshold = (minConfidenceThreshold >= 0.0) ? minConfidenceThreshold : 0.50;
+            this.hybridSearch = (hybridSearch != null) ? hybridSearch : new HybridSearch(true, 0.65, 0.35, 60);
+            this.reranking = (reranking != null) ? reranking : new Reranking(true, 8, 0.30);
         }
 
-        // Backward compatibility constructor
         public Retrieval(int defaultTopK, double defaultSimilarityThreshold) {
             this(defaultTopK, defaultSimilarityThreshold, 0.50,
                     new HybridSearch(true, 0.65, 0.35, 60),
@@ -133,7 +149,6 @@ public record RagProperties(
         }
     }
 
-    // Backward-compatible constructor for 3-argument usage in tests
     public RagProperties(Chunking chunking, Retrieval retrieval, Storage storage) {
         this(
                 new Quality(true, 0.40, true),
@@ -143,5 +158,9 @@ public record RagProperties(
                 new Grounding(true, true, "I am unable to answer based on the provided documents because the information is not present in the retrieved context."),
                 storage
         );
+    }
+
+    public static RagProperties defaults() {
+        return new RagProperties(null, null, null, null, null, null);
     }
 }
