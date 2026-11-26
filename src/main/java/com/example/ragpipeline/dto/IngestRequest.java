@@ -4,5 +4,10 @@ public record IngestRequest(
         String title,
         String content,
         Integer chunkSize,
-        Integer chunkOverlap
-) {}
+        Integer chunkOverlap,
+        String strategy
+) {
+    public IngestRequest(String title, String content, Integer chunkSize, Integer chunkOverlap) {
+        this(title, content, chunkSize, chunkOverlap, null);
+    }
+}

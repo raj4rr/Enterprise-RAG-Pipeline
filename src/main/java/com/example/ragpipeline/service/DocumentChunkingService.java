@@ -3,6 +3,7 @@ package com.example.ragpipeline.service;
 import com.example.ragpipeline.config.RagProperties;
 import com.example.ragpipeline.dto.ChunkInfo;
 import com.example.ragpipeline.dto.ChunkPreviewResponse;
+import com.example.ragpipeline.splitter.ChunkingStrategy;
 import com.example.ragpipeline.splitter.OverlappingTextSplitter;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
@@ -15,27 +16,44 @@ import java.util.Map;
 public class DocumentChunkingService {
 
     private final OverlappingTextSplitter textSplitter;
+    private final DocumentQualityService documentQualityService;
     private final RagProperties ragProperties;
 
-    public DocumentChunkingService(OverlappingTextSplitter textSplitter, RagProperties ragProperties) {
+    public DocumentChunkingService(OverlappingTextSplitter textSplitter,
+                                  DocumentQualityService documentQualityService,
+                                  RagProperties ragProperties) {
         this.textSplitter = textSplitter;
+        this.documentQualityService = documentQualityService;
         this.ragProperties = ragProperties;
     }
 
     /**
-     * Splits a list of documents into overlapping chunks.
+     * Splits a list of documents into optimized overlapping chunks with quality cleansing.
      */
     public List<Document> chunkDocuments(List<Document> documents, Integer requestedChunkSize, Integer requestedChunkOverlap) {
+        return chunkDocuments(documents, requestedChunkSize, requestedChunkOverlap, null);
+    }
+
+    /**
+     * Splits a list of documents with specified strategy, size, overlap, and cleans document text.
+     */
+    public List<Document> chunkDocuments(List<Document> documents, Integer requestedChunkSize, Integer requestedChunkOverlap, String requestedStrategy) {
         int chunkSize = resolveChunkSize(requestedChunkSize);
         int chunkOverlap = resolveChunkOverlap(requestedChunkOverlap, chunkSize);
+        ChunkingStrategy strategy = (requestedStrategy != null && !requestedStrategy.isBlank())
+                ? ChunkingStrategy.fromString(requestedStrategy)
+                : ChunkingStrategy.fromString(ragProperties.chunking().strategy());
 
         List<Document> allChunks = new ArrayList<>();
         int runningIndex = 0;
 
         for (Document doc : documents) {
-            List<Document> docChunks = textSplitter.splitDocument(doc, chunkSize, chunkOverlap);
+            // 1. Clean and enrich document quality first
+            Document cleanDoc = documentQualityService.cleanAndEnrichDocument(doc);
+
+            // 2. Split with optimized strategy
+            List<Document> docChunks = textSplitter.splitDocument(cleanDoc, chunkSize, chunkOverlap, strategy);
             for (Document chunk : docChunks) {
-                // Re-index across multiple docs if needed
                 chunk.getMetadata().put("global_chunk_index", runningIndex++);
                 allChunks.add(chunk);
             }
@@ -48,14 +66,24 @@ public class DocumentChunkingService {
      * Generates a preview of chunks without persisting to the vector database.
      */
     public ChunkPreviewResponse previewChunks(String text, Integer requestedChunkSize, Integer requestedChunkOverlap) {
+        return previewChunks(text, requestedChunkSize, requestedChunkOverlap, null);
+    }
+
+    public ChunkPreviewResponse previewChunks(String text, Integer requestedChunkSize, Integer requestedChunkOverlap, String requestedStrategy) {
         if (text == null || text.isBlank()) {
             return new ChunkPreviewResponse(0, 0, 0, 0, List.of());
         }
 
         int chunkSize = resolveChunkSize(requestedChunkSize);
         int chunkOverlap = resolveChunkOverlap(requestedChunkOverlap, chunkSize);
+        ChunkingStrategy strategy = (requestedStrategy != null && !requestedStrategy.isBlank())
+                ? ChunkingStrategy.fromString(requestedStrategy)
+                : ChunkingStrategy.fromString(ragProperties.chunking().strategy());
 
-        List<String> rawChunks = textSplitter.splitText(text, chunkSize, chunkOverlap);
+        var qualityReport = documentQualityService.inspectAndClean(text, "preview");
+        String textToChunk = qualityReport.cleanedText();
+
+        List<String> rawChunks = textSplitter.splitText(textToChunk, chunkSize, chunkOverlap, strategy);
         List<ChunkInfo> chunkInfos = new ArrayList<>();
 
         for (int i = 0; i < rawChunks.size(); i++) {
@@ -69,13 +97,19 @@ public class DocumentChunkingService {
                     content.length(),
                     words,
                     overlap,
-                    Map.of("chunkSize", chunkSize, "chunkOverlap", chunkOverlap)
+                    Map.of(
+                            "chunkSize", chunkSize,
+                            "chunkOverlap", chunkOverlap,
+                            "strategy", strategy.name(),
+                            "qualityScore", qualityReport.qualityScore(),
+                            "qualityStatus", qualityReport.status()
+                    )
             ));
         }
 
         return new ChunkPreviewResponse(
                 chunkInfos.size(),
-                text.length(),
+                textToChunk.length(),
                 chunkSize,
                 chunkOverlap,
                 chunkInfos
@@ -83,7 +117,7 @@ public class DocumentChunkingService {
     }
 
     public int resolveChunkSize(Integer requested) {
-        if (requested != null && requested > 20) {
+        if (requested != null && requested >= 100) {
             return requested;
         }
         return ragProperties.chunking().defaultChunkSize();
@@ -91,8 +125,8 @@ public class DocumentChunkingService {
 
     public int resolveChunkOverlap(Integer requested, int chunkSize) {
         if (requested != null && requested >= 0) {
-            return Math.min(requested, chunkSize - 10);
+            return textSplitter.optimizeOverlap(chunkSize, requested);
         }
-        return Math.min(ragProperties.chunking().defaultChunkOverlap(), chunkSize - 10);
+        return textSplitter.optimizeOverlap(chunkSize, ragProperties.chunking().defaultChunkOverlap());
     }
 }

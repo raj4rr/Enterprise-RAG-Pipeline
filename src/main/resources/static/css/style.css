@@ -141,6 +141,22 @@ header {
   color: var(--accent-cyan);
 }
 
+.badge.amber {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--accent-amber);
+}
+
+.badge.rose {
+  background: rgba(244, 63, 94, 0.15);
+  border-color: rgba(244, 63, 94, 0.3);
+  color: var(--accent-rose);
+}
+
+.citation-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .pulse-dot {
   width: 7px;
   height: 7px;

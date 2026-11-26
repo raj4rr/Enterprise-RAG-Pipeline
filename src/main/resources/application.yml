@@ -15,20 +15,44 @@ spring:
         enabled: true
         options:
           model: qwen2.5:1.5b
-          temperature: 0.3
+          temperature: 0.2
       embedding:
         enabled: true
         options:
           model: nomic-embed-text:latest
 
 rag:
+  quality:
+    clean-noise: true
+    min-quality-score: 0.40
+    strip-boilerplate: true
   chunking:
     default-chunk-size: 500
     default-chunk-overlap: 100
     min-chunk-size-chars: 50
+    strategy: SENTENCE_AWARE
+  embedding:
+    model: nomic-embed-text:latest
+    use-asymmetric-prefixes: true
+    query-prefix: "search_query: "
+    document-prefix: "search_document: "
   retrieval:
     default-top-k: 4
     default-similarity-threshold: 0.55
+    min-confidence-threshold: 0.50
+    hybrid-search:
+      enabled: true
+      dense-weight: 0.65
+      sparse-weight: 0.35
+      rrf-k: 60
+    reranking:
+      enabled: true
+      top-n-candidates: 8
+      min-rerank-score: 0.30
+  grounding:
+    strict-mode: true
+    require-citations: true
+    insufficient-context-message: "I am unable to answer based on the provided documents because the information is not present in the retrieved context."
   storage:
     upload-dir: data/uploads
     vector-store-file: data/vectors/vector_store.json

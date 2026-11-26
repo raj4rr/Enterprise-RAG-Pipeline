@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Enterprise RAG Pipeline built with Spring AI, Java 25, Ollama and Vector Store">
-    <title>Spring AI RAG Pipeline | Java 25 Enterprise</title>
+    <meta name="description" content="Enterprise RAG Pipeline built with Spring AI, Java 25, Ollama, Hybrid Search, Reranking, Strict Grounding, and Separate Retrieval/Generation Evaluation">
+    <title>Spring AI Enterprise RAG Pipeline | Java 25</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,19 +17,19 @@
             <div class="logo-group">
                 <div class="logo-icon">⚡</div>
                 <div class="logo-text">
-                    <h1>Spring AI RAG Pipeline</h1>
-                    <p>Document Ingestion • Overlapping Chunker • Vector Search • LLM Chat</p>
+                    <h1>Enterprise Spring AI RAG Pipeline</h1>
+                    <p>Document Quality • Hybrid Search • Reranking • Strict Grounding • Citations • Dual Evaluation</p>
                 </div>
             </div>
 
             <div class="header-badges">
                 <div class="badge success" id="statusBadge">
-                    <span class="pulse-dot"></span> Java 25
+                    <span class="pulse-dot"></span> Java 25 Loom
                 </div>
                 <div class="badge purple">
                     🍃 Spring AI 1.0.0
                 </div>
-                <div class="badge cyan">
+                <div class="badge cyan" id="embeddingModelBadge">
                     🧠 nomic-embed-text
                 </div>
                 <div class="badge" id="headerDocCount">
@@ -50,10 +50,13 @@
                 <span>📁</span> Document Ingestion & Chunks
             </button>
             <button class="tab-btn" data-tab="tab-vectordb" id="tabBtnVectorDb">
-                <span>🔍</span> Vector DB & Search
+                <span>🔍</span> Hybrid Search & Filtering
             </button>
             <button class="tab-btn" data-tab="tab-chat" id="tabBtnChat">
-                <span>💬</span> RAG AI Chatbot
+                <span>💬</span> Grounded RAG Chat
+            </button>
+            <button class="tab-btn" data-tab="tab-eval" id="tabBtnEval">
+                <span>📊</span> Retrieval & Generation Evaluation
             </button>
         </nav>
 
@@ -64,8 +67,8 @@
                 <div class="card">
                     <div class="card-header">
                         <div>
-                            <h2 class="card-title"><span>📥</span> Document Ingestion</h2>
-                            <p class="card-subtitle">Upload documents (PDF, DOCX, TXT, MD, CSV) or enter raw text</p>
+                            <h2 class="card-title"><span>📥</span> Document Ingestion & Quality Cleanser</h2>
+                            <p class="card-subtitle">Normalizes typography, removes noise/scripts, calculates quality score, and chunks</p>
                         </div>
                     </div>
 
@@ -89,6 +92,20 @@
                         <textarea id="rawTextInput" rows="4" placeholder="Paste custom document text, articles, policies, or notes here..."></textarea>
                     </div>
 
+                    <!-- Chunking Strategy Selector -->
+                    <div class="form-group">
+                        <label class="form-label" for="chunkStrategy">
+                            <span>Chunking Strategy</span>
+                            <span class="badge purple" id="strategyBadge" style="font-size: 0.7rem;">Sentence Boundary Aware</span>
+                        </label>
+                        <select id="chunkStrategy" class="form-select" style="width: 100%; background: var(--bg-secondary); color: var(--text-main); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px 12px;">
+                            <option value="SENTENCE_AWARE" selected>Sentence-Aware (Sliding Window snapped to sentence punctuation)</option>
+                            <option value="PARAGRAPH_AWARE">Paragraph & Header Aware (Markdown # and \n\n boundaries)</option>
+                            <option value="ADAPTIVE">Adaptive (Dynamic sizing based on document length)</option>
+                            <option value="FIXED">Fixed Character Window (Basic word break)</option>
+                        </select>
+                    </div>
+
                     <!-- Chunk Size Slider -->
                     <div class="form-group">
                         <label class="form-label" for="chunkSize">
@@ -101,7 +118,7 @@
                     <!-- Overlap Slider -->
                     <div class="form-group">
                         <label class="form-label" for="chunkOverlap">
-                            <span>Chunk Overlap (characters)</span>
+                            <span>Chunk Overlap (characters - bounded 10% to 35%)</span>
                             <span class="slider-val" id="chunkOverlapVal">100</span>
                         </label>
                         <input type="range" id="chunkOverlap" min="0" max="500" step="25" value="100">
@@ -119,7 +136,7 @@
                             👁️ Preview Chunks
                         </button>
                         <button type="button" class="btn" id="btnIngest" style="flex: 1.5;">
-                            ⚡ Ingest & Save to Vector DB
+                            ⚡ Clean, Ingest & Index
                         </button>
                     </div>
                 </div>
@@ -128,37 +145,59 @@
                 <div class="card">
                     <div class="card-header">
                         <div>
-                            <h2 class="card-title"><span>✂️</span> Chunk Visualizer</h2>
-                            <p class="card-subtitle">Real-time inspection of split chunks and boundary preservation</p>
+                            <h2 class="card-title"><span>✂️</span> Chunk & Quality Visualizer</h2>
+                            <p class="card-subtitle">Real-time inspection of document quality, boundaries, and metadata</p>
                         </div>
                         <span class="badge purple" id="previewCountBadge" style="display: none;">0 chunks</span>
                     </div>
 
+                    <!-- Quality Report Pill if available -->
+                    <div id="qualityPillContainer" style="display: none; margin-bottom: 12px;"></div>
+
                     <div class="chunks-container" id="previewContainer">
                         <div style="text-align: center; color: var(--text-dim); padding: 60px 20px;">
                             <span style="font-size: 32px; display: block; margin-bottom: 10px;">🔍</span>
-                            Upload a file or enter text, then click <strong>"Preview Chunks"</strong> or <strong>"Ingest & Save"</strong> to visualize how the document is split with overlapping.
+                            Upload a file or enter text, then click <strong>"Preview Chunks"</strong> or <strong>"Clean, Ingest & Index"</strong> to visualize how text is sanitized, scored for quality, and split with optimized overlap.
                         </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- TAB 2: Vector DB Explorer -->
+        <!-- TAB 2: Vector DB & Hybrid Search -->
         <section class="tab-content" id="tab-vectordb">
             <div class="grid-2">
-                <!-- Left: Vector DB Search Tester -->
+                <!-- Left: Hybrid Search Tester -->
                 <div class="card">
                     <div class="card-header">
                         <div>
-                            <h2 class="card-title"><span>🎯</span> Vector Similarity Search Test</h2>
-                            <p class="card-subtitle">Test semantic retrieval against stored document embeddings</p>
+                            <h2 class="card-title"><span>🎯</span> Hybrid Search & Reranker Test</h2>
+                            <p class="card-subtitle">Dense Vector + Sparse BM25 Fusion with Cross-Encoder Reranking</p>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Search Query</label>
-                        <input type="text" id="searchQuery" placeholder="e.g., What are the terms of the agreement?">
+                        <input type="text" id="searchQuery" placeholder="e.g., Why is sliding-window chunk overlap important?">
+                    </div>
+
+                    <!-- Search Controls: Toggles & Filters -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group">
+                            <label class="form-label">Metadata Filter (Source Filename)</label>
+                            <input type="text" id="searchSourceFilter" placeholder="e.g. spring_ai_architecture.md">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Retrieval Features</label>
+                            <div style="display: flex; gap: 14px; margin-top: 8px;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer;">
+                                    <input type="checkbox" id="toggleHybrid" checked> BM25 Hybrid
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer;">
+                                    <input type="checkbox" id="toggleRerank" checked> Reranker
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -167,14 +206,14 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Similarity Threshold: <span class="slider-val" id="searchThresholdVal">0.50</span></label>
-                        <input type="range" id="searchThreshold" min="0.10" max="0.95" step="0.05" value="0.50" oninput="document.getElementById('searchThresholdVal').textContent = this.value">
+                        <label class="form-label">Similarity Threshold: <span class="slider-val" id="searchThresholdVal">0.45</span></label>
+                        <input type="range" id="searchThreshold" min="0.10" max="0.95" step="0.05" value="0.45" oninput="document.getElementById('searchThresholdVal').textContent = this.value">
                     </div>
 
-                    <button class="btn" id="btnSearchTest">Run Vector Search</button>
+                    <button class="btn" id="btnSearchTest">Run Hybrid Search</button>
 
                     <div class="chunks-container" id="searchResultsContainer" style="margin-top: 12px; max-height: 280px;">
-                        <div style="color: var(--text-dim); font-size: 0.85rem;">Matching vector chunks will appear here.</div>
+                        <div style="color: var(--text-dim); font-size: 0.85rem;">Matching vector chunks will appear here with dense, sparse, and rerank scores.</div>
                     </div>
                 </div>
 
@@ -182,8 +221,8 @@
                 <div class="card">
                     <div class="card-header">
                         <div>
-                            <h2 class="card-title"><span>📊</span> Vector DB Overview</h2>
-                            <p class="card-subtitle">Local persistent storage and indexed documents</p>
+                            <h2 class="card-title"><span>📊</span> Vector DB & Indexes Overview</h2>
+                            <p class="card-subtitle">Local persistent storage, BM25 inverted index & tracked files</p>
                         </div>
                         <button class="btn btn-danger" id="btnResetVector" style="padding: 6px 12px; font-size: 0.8rem;">
                             🗑️ Reset Store
@@ -191,17 +230,18 @@
                     </div>
 
                     <div>
-                        <h4 style="font-size: 0.88rem; margin-bottom: 8px; color: var(--text-muted);">Indexed Files:</h4>
+                        <h4 style="font-size: 0.88rem; margin-bottom: 8px; color: var(--text-muted);">Indexed Source Documents:</h4>
                         <ul id="storedDocsList" style="list-style: none; font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
                             <li style="color: var(--text-dim);">Loading...</li>
                         </ul>
                     </div>
 
-                    <div style="background: rgba(10, 13, 20, 0.4); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 6px;">
-                        <div><strong>Embedding Model:</strong> <span style="color: var(--accent-cyan);">nomic-embed-text (Ollama)</span></div>
-                        <div><strong>Chat Model:</strong> <span style="color: var(--accent-emerald);">qwen2.5:1.5b (Ollama)</span></div>
+                    <div style="background: rgba(10, 13, 20, 0.4); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 6px; margin-top: 12px;">
+                        <div><strong>Embedding Model:</strong> <span style="color: var(--accent-cyan);" id="infoEmbeddingModel">nomic-embed-text:latest (Ollama)</span></div>
+                        <div><strong>Asymmetric Prefixes:</strong> <span style="color: var(--accent-emerald);">search_query: / search_document:</span></div>
+                        <div><strong>Sparse Search:</strong> <span style="color: var(--accent-amber);">In-Memory BM25 (K1=1.2, B=0.75, RRF Fusion)</span></div>
+                        <div><strong>Reranker:</strong> <span style="color: var(--accent-primary);">Cross-Attention Semantic Scoring (Top-8 -> Top-K)</span></div>
                         <div><strong>Persistence:</strong> <span style="color: var(--text-muted);">data/vectors/vector_store.json</span></div>
-                        <div><strong>Architecture:</strong> <span style="color: var(--text-muted);">In-Memory + JSON Disk Backup (SimpleVectorStore)</span></div>
                     </div>
                 </div>
             </div>
@@ -212,11 +252,14 @@
             <div class="chat-window">
                 <div class="chat-header">
                     <div>
-                        <h2 style="font-size: 1rem; font-weight: 700;">🤖 RAG Conversational Assistant</h2>
-                        <span style="font-size: 0.75rem; color: var(--text-muted);">Powered by Spring AI & Local LLM</span>
+                        <h2 style="font-size: 1rem; font-weight: 700;">🤖 Grounded RAG Assistant</h2>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Strict Grounding • Verifiable Citations • Confidence Gates</span>
                     </div>
-                    <div class="badge success">
-                        <span>●</span> Connected to Ollama
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span class="badge cyan" id="groundingModeBadge">Strict Grounding Active</span>
+                        <div class="badge success">
+                            <span>●</span> Ollama Connected
+                        </div>
                     </div>
                 </div>
 
@@ -226,7 +269,7 @@
                         <div class="avatar assistant">🤖</div>
                         <div class="bubble">
                             <div class="message-content">
-                                Hello! I am your Spring AI RAG Assistant. Upload your documents in the <strong>Ingestion</strong> tab, and ask me any questions. I will search the vector database for relevant chunks and formulate grounded answers with verified citations!
+                                Hello! I am your Enterprise Spring AI RAG Assistant. I use <strong>Hybrid Search</strong>, <strong>Cross-Encoder Reranking</strong>, and <strong>Strict Grounding</strong> to answer based solely on your documents. Every response includes verified source citations and a confidence rating. If information is not in the context, I will refuse safely rather than hallucinate!
                             </div>
                         </div>
                     </div>
@@ -234,9 +277,9 @@
 
                 <!-- Prompt suggestion pills -->
                 <div class="prompt-pills">
-                    <button class="pill-btn">Summarize the uploaded document</button>
-                    <button class="pill-btn">What are the primary key takeaways?</button>
-                    <button class="pill-btn">List key technical specifications</button>
+                    <button class="pill-btn">Why does sliding-window chunk overlap matter?</button>
+                    <button class="pill-btn">What embedding model is configured and why?</button>
+                    <button class="pill-btn">How does SimpleVectorStore persist embeddings to disk?</button>
                 </div>
 
                 <!-- Input area -->
@@ -245,6 +288,125 @@
                     <button class="btn" id="btnSendMessage" style="padding: 0 20px;">
                         <span>Send</span> ➔
                     </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: Evaluation & Quality Benchmark -->
+        <section class="tab-content" id="tab-eval">
+            <div class="grid-2">
+                <!-- Left: Benchmark Suite Runner -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title"><span>📈</span> Dual RAG Evaluation Benchmark</h2>
+                            <p class="card-subtitle">Evaluates Retrieval (Hit Rate, Recall, MRR) and Generation (Faithfulness, Relevance, Citations) independently</p>
+                        </div>
+                        <button class="btn" id="btnRunBenchmark" style="padding: 8px 16px; font-size: 0.85rem;">
+                            🚀 Run Benchmark Suite
+                        </button>
+                    </div>
+
+                    <div id="benchmarkLoading" style="display: none; text-align: center; padding: 30px; color: var(--accent-cyan);">
+                        <span class="pulse-dot" style="display: inline-block; margin-right: 8px;"></span>
+                        Running comprehensive dual evaluation tests...
+                    </div>
+
+                    <div id="benchmarkResults" style="display: none;">
+                        <!-- Overall Pipeline Health Gauge -->
+                        <div style="background: rgba(10, 13, 20, 0.5); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.05em;">Overall RAG Pipeline Health</div>
+                                <div style="font-size: 1.8rem; font-weight: 800; color: var(--accent-emerald);" id="metricOverallHealth">94.2%</div>
+                            </div>
+                            <div class="badge success" style="font-size: 0.85rem;" id="healthStatusBadge">ENTERPRISE GRADE</div>
+                        </div>
+
+                        <!-- 2-Column Metrics Scorecard -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                            <!-- Retrieval Metrics Column -->
+                            <div style="background: rgba(17, 22, 34, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+                                <h4 style="color: var(--accent-cyan); font-size: 0.85rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                                    <span>🔍</span> Retrieval Metrics
+                                </h4>
+                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: var(--text-muted);">Hit Rate:</span>
+                                        <strong style="color: var(--text-main);" id="metricHitRate">100%</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: var(--text-muted);">Recall@K:</span>
+                                        <strong style="color: var(--text-main);" id="metricRecall">100%</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: var(--text-muted);">Mean Reciprocal Rank (MRR):</span>
+                                        <strong style="color: var(--text-main);" id="metricMRR">1.00</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: var(--text-muted);">Context Relevance:</span>
+                                        <strong style="color: var(--text-main);" id="metricContextRel">88.5%</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Generation Metrics Column -->
+                            <div style="background: rgba(17, 22, 34, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+                                <h4 style="color: var(--accent-emerald); font-size: 0.85rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                                    <span>✍️</span> Generation Metrics
+                                </h4>
+                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: var(--text-muted);">Faithfulness / Grounding:</span>
+                                        <strong style="color: var(--accent-emerald);" id="metricFaithfulness">100%</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: var(--text-muted);">Answer Relevance:</span>
+                                        <strong style="color: var(--text-main);" id="metricAnswerRel">92.0%</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: var(--text-muted);">Citation Precision:</span>
+                                        <strong style="color: var(--accent-cyan);" id="metricCitationPrec">100%</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: var(--text-muted);">Hallucination Rate:</span>
+                                        <strong style="color: var(--accent-emerald);" id="metricHallucination">0.0%</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Per-query details table -->
+                        <h4 style="font-size: 0.85rem; margin-bottom: 8px; color: var(--text-muted);">Benchmark Query Breakdown:</h4>
+                        <div id="benchmarkCaseBreakdown" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;"></div>
+                    </div>
+
+                    <div id="benchmarkEmptyPrompt" style="text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 0.85rem;">
+                        Click <strong>"Run Benchmark Suite"</strong> above to evaluate Retrieval and Generation metrics across test cases.
+                    </div>
+                </div>
+
+                <!-- Right: Ad-hoc Query Evaluation Inspector -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title"><span>🔬</span> Custom Query Evaluator</h2>
+                            <p class="card-subtitle">Test retrieval recall & context relevance for any specific query</p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Test Query</label>
+                        <input type="text" id="evalCustomQuery" placeholder="e.g. How does sliding-window chunk overlap preserve context?">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Expected Keywords (comma-separated)</label>
+                        <input type="text" id="evalCustomKeywords" placeholder="e.g. sliding, overlap, context, boundary">
+                    </div>
+
+                    <button class="btn btn-secondary" id="btnRunCustomEval" style="width: 100%;">Evaluate Retrieval & Context</button>
+
+                    <div id="customEvalResult" style="margin-top: 14px; font-size: 0.85rem; display: none;"></div>
                 </div>
             </div>
         </section>

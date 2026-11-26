@@ -9,6 +9,7 @@ This application provides a complete, 100% local, privacy-first document ingesti
 ## 📑 Table of Contents
 
 - [Key Highlights](#-key-highlights)
+- [Enterprise RAG Optimization: 10 Implemented Approaches](#-enterprise-rag-optimization-10-implemented-approaches)
 - [Architecture & Workflow](#-architecture--workflow)
 - [Chunking Strategy: Why Overlap Matters](#-chunking-strategy-why-overlap-matters)
 - [Tech Stack](#-tech-stack)
@@ -20,6 +21,25 @@ This application provides a complete, 100% local, privacy-first document ingesti
 - [Configuration Reference (`application.yml`)](#-configuration-reference)
 - [Engineering & Troubleshooting Notes](#-engineering--troubleshooting-notes)
 - [Testing](#-testing)
+
+---
+
+## 🚀 Enterprise RAG Optimization: 10 Implemented Approaches
+
+This pipeline implements the top 10 industry-standard optimization techniques for enterprise-grade Retrieval-Augmented Generation:
+
+| # | Optimization Approach | Implementation & Architecture | Key Benefits |
+|---|----------------------|------------------------------|--------------|
+| **1** | **Improve Document Quality** | [`DocumentQualityService`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/service/DocumentQualityService.java): NFKC unicode normalizer, non-printable control char scrubber, HTML/script stripper, broken hyphen repair, lexical diversity & noise ratio scoring with threshold gating. | Eliminates token waste, prevents ingestion of unparsed junk/corrupted files, and cleans typography before chunking. |
+| **2** | **Optimize Chunk Size & Overlap** | [`OverlappingTextSplitter`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/splitter/OverlappingTextSplitter.java) & [`ChunkingStrategy`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/splitter/ChunkingStrategy.java): `SENTENCE_AWARE`, `PARAGRAPH_AWARE`, `ADAPTIVE`, and `FIXED`. Overlap strictly clamped between 10% and 35% of chunk size. | Prevents semantic severance across sentence/heading boundaries while guarding against redundant vector store bloating. |
+| **3** | **Use Appropriate Embedding Models** | [`EmbeddingModelService`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/service/EmbeddingModelService.java): Model profile registry with asymmetric task instruction prefixes (`search_query: ` for queries, `search_document: ` for chunks with `nomic-embed-text`). | Drastically improves retrieval recall and vector alignment by matching the embedding model's pre-training prompt format. |
+| **4** | **Apply Metadata Filtering** | [`HybridSearchService`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/service/HybridSearchService.java): Multi-attribute filtering (source file name, content type, minimum quality score, upload date range, custom tags) evaluated during search. | Narrows candidate pools to authorized, relevant, or high-quality documents before expensive ranking and prompt formulation. |
+| **5** | **Use Hybrid Search** | [`HybridSearchService`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/service/HybridSearchService.java): In-memory BM25 sparse keyword inverted index fused with dense cosine vector similarity using Reciprocal Rank Fusion (RRF) and weighted linear combination. | Bridges semantic conceptual queries with exact keyword lookups (technical terms, acronyms, code identifiers, part numbers). |
+| **6** | **Apply Reranking** | [`RerankingService`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/service/RerankingService.java): Cross-encoder semantic scoring that evaluates exact phrase density, query token coverage, term proximity, and positional saliency (headings/openings) from top-N candidates. | Surfaces the most accurate chunks to top-K, eliminating false positives from initial vector distance calculations. |
+| **7** | **Define Strict Grounding Instructions** | [`CitationService.buildStrictSystemPrompt()`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/service/CitationService.java): Strict anti-hallucination prompt constraints, mandatory reliance on provided context, refusal template, and prompt-injection guardrails. | Guarantees zero out-of-domain speculation and instructs the model to refuse safely when context is absent or contradictory. |
+| **8** | **Require Citations** | [`CitationService.verifyCitations()`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/service/CitationService.java): Inline citation enforcement (`[Source: filename, Chunk #N]`) paired with automated regex parsing, chunk existence verification, and claim grounding validation. | Enables automated auditing and verification of every generated claim with supporting text snippets and grounding scores. |
+| **9** | **Use Confidence Thresholds** | [`RagChatService`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/service/RagChatService.java): Multi-tier confidence gating. When retrieval/rerank score < `minConfidenceThreshold` (0.50), short-circuits LLM invocation and immediately returns safe refusal. Computes `HIGH`, `MEDIUM`, `LOW`, and `INSUFFICIENT_CONTEXT` ratings. | Saves LLM compute tokens, reduces latency to milliseconds on unanswerable queries, and prevents hallucinated responses. |
+| **10** | **Evaluate Retrieval & Generation Separately** | [`RagEvaluationService`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/service/RagEvaluationService.java) & [`RagEvaluationController`](file:///Users/rajesh/IdeaProjects/Enterprise-RAG-Pipeline/src/main/java/com/example/ragpipeline/controller/RagEvaluationController.java): Decoupled evaluation of Retrieval (Hit Rate, Recall@K, Precision@K, MRR, Context Relevance) and Generation (Faithfulness, Answer Relevance, Citation Precision, Hallucination Rate). Includes automated Benchmark Suite. | Isolates retrieval failures from generation failures for targeted, quantifiable continuous improvement of RAG pipelines. |
 
 ---
 
