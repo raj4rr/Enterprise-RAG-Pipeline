@@ -499,7 +499,278 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // --- TAB 4: Evaluation Benchmark Handler ---
+    // --- TAB 4: Evaluation Benchmark & Metric Formulas Registry ---
+    const METRIC_DEFINITIONS = {
+        overallHealth: {
+            title: "Composite RAG Pipeline Health",
+            category: "System Quality Index",
+            formula: "Health = 0.20·HitRate + 0.15·MRR + 0.15·ContextRel + 0.25·Faithfulness + 0.15·AnswerRel + 0.10·CitationPrec",
+            calculation: [
+                "Computes a weighted harmonic balance across 6 decoupled evaluation dimensions.",
+                "Prioritizes Grounding/Faithfulness (25%) and Retrieval Recall (20%) to prevent hallucinations while maximizing coverage.",
+                "Normalizes composite score into a single 0–100% enterprise readiness grade."
+            ],
+            target: "≥ 80% Enterprise Grade | ≥ 60% Production Ready | < 60% Degraded"
+        },
+        hitRate: {
+            title: "Hit Rate",
+            category: "Retrieval Metric",
+            formula: "Hit Rate = (1 / |Q|) × ∑ 𝕀(RelevantChunk ∈ Top-K)",
+            calculation: [
+                "Evaluates whether at least one target ground-truth chunk or expected term is retrieved in top-K.",
+                "Returns 1.0 (100%) if any relevant chunk is captured in candidate set, otherwise 0.0 (0%).",
+                "Averages across all test queries in the benchmark suite."
+            ],
+            target: "≥ 90% Optimal | 70–89% Strong | < 70% Poor"
+        },
+        recall: {
+            title: "Recall@K",
+            category: "Retrieval Metric",
+            formula: "Recall@K = |Retrieved Relevant Chunks in Top-K| / |Total Expected Target Documents|",
+            calculation: [
+                "Counts total distinct relevant ground-truth document sources surfaced in the top-K window.",
+                "Divides captured relevant documents by total expected target documents.",
+                "Quantifies whether candidate pool retains all requisite information for answering."
+            ],
+            target: "≥ 80% Optimal | 60–79% Strong | < 60% Needs Tuning"
+        },
+        precisionAtK: {
+            title: "Precision@K",
+            category: "Retrieval Density Metric",
+            formula: "Precision@K = |Relevant Chunks in Top-K| / K",
+            calculation: [
+                "Examines all K candidate chunks returned by dense vector + BM25 hybrid search.",
+                "Calculates proportion of retrieved chunks containing expected reference concepts.",
+                "Measures signal density: higher precision prevents LLM context window clutter."
+            ],
+            target: "≥ 75% Optimal | 50–74% Strong | < 50% Low Density"
+        },
+        mrr: {
+            title: "Mean Reciprocal Rank (MRR)",
+            category: "Ranking Quality Metric",
+            formula: "MRR = (1 / |Q|) × ∑ (1 / Rank of First Relevant Chunk)",
+            calculation: [
+                "Finds positional rank (1-based index) of the highest-ranked relevant chunk.",
+                "Takes reciprocal: Rank #1 → 1/1 = 1.00; Rank #2 → 1/2 = 0.50; Rank #3 → 1/3 = 0.33.",
+                "Penalizes retrieval when cross-encoder reranker fails to surface key evidence to top positions."
+            ],
+            target: "≥ 0.90 1st Rank | ≥ 0.50 Top-2 | < 0.50 Suboptimal"
+        },
+        contextRel: {
+            title: "Context Relevance",
+            category: "Retrieval Signal Metric",
+            formula: "ContextRel = ∑ count(QueryTerm ∈ Chunks) / (|QueryTerms| × min(K, 2))",
+            calculation: [
+                "Extracts non-stopword query keywords and domain terminology.",
+                "Scans retrieved chunks for density and frequency of query concepts.",
+                "Penalizes off-topic chunks to guarantee high signal-to-noise context for generation."
+            ],
+            target: "≥ 80% High Density | 60–79% Moderate | < 60% Noisy"
+        },
+        faithfulness: {
+            title: "Faithfulness / Grounding",
+            category: "Generation Factuality Metric",
+            formula: "Faithfulness = |Supported Claims| / |Total Claims in Answer|",
+            calculation: [
+                "Segments LLM completion into individual propositional sentences.",
+                "Cross-examines each claim against retrieved chunks with ≥ 35% lexical/semantic overlap requirement.",
+                "Identifies unsupported statements and measures grounded factual precision."
+            ],
+            target: "≥ 85% Grounded | 65–84% Acceptable | < 65% Hallucination Risk"
+        },
+        answerRel: {
+            title: "Answer Relevance",
+            category: "Generation Alignment Metric",
+            formula: "AnswerRel = |Salient Query Terms in Answer| / |Total Salient Query Terms|",
+            calculation: [
+                "Isolates salient non-stopword query tokens representing user intent.",
+                "Determines whether generated LLM completion directly addresses query subjects.",
+                "Prevents evasive answers, generic disclaimers, or off-topic hallucinations."
+            ],
+            target: "≥ 80% Direct Answer | 60–79% Partial | < 60% Tangential"
+        },
+        citationPrec: {
+            title: "Citation Precision",
+            category: "Generation Verification Metric",
+            formula: "Citation Precision = |Verified Inline Citations| / |Total Inline Citations|",
+            calculation: [
+                "Parses all inline citations matching `[Source: <file>, Chunk #<N>]` regex.",
+                "Verifies that each citation points to an actual chunk in the retrieved candidate set.",
+                "Confirms document source metadata exists and was not fabricated."
+            ],
+            target: "100% Fully Verified | < 100% Invalid Citations Detected"
+        },
+        hallucination: {
+            title: "Hallucination Rate",
+            category: "Safety & Risk Metric",
+            formula: "Hallucination Rate = 1.0 - Faithfulness Score",
+            calculation: [
+                "Inverts Faithfulness score to measure unsupported factual risk.",
+                "Represents percentage of claims that lack verification in retrieved documents.",
+                "Zero risk (0.0%) indicates total grounding in ingested context."
+            ],
+            target: "≤ 10% Minimal Risk | 10–30% Moderate Risk | > 30% High Risk"
+        }
+    };
+
+    function getMetricGrade(val, type = 'normal') {
+        if (type === 'hallucination') {
+            if (val <= 0.10) return { label: 'MINIMAL RISK', className: 'metric-grade-optimal', color: 'var(--accent-emerald)', fillClass: 'fill-emerald' };
+            if (val <= 0.30) return { label: 'MODERATE RISK', className: 'metric-grade-fair', color: 'var(--accent-amber)', fillClass: 'fill-amber' };
+            return { label: 'HIGH RISK', className: 'metric-grade-poor', color: 'var(--accent-rose)', fillClass: 'fill-rose' };
+        }
+        if (type === 'mrr') {
+            if (val >= 0.95) return { label: '1ST RANK', className: 'metric-grade-optimal', color: 'var(--accent-emerald)', fillClass: 'fill-emerald' };
+            if (val >= 0.50) return { label: 'TOP 2', className: 'metric-grade-strong', color: 'var(--accent-cyan)', fillClass: 'fill-cyan' };
+            if (val >= 0.33) return { label: 'TOP 3', className: 'metric-grade-fair', color: 'var(--accent-amber)', fillClass: 'fill-amber' };
+            return { label: 'LOW RANK', className: 'metric-grade-poor', color: 'var(--accent-rose)', fillClass: 'fill-rose' };
+        }
+        if (val >= 0.85) return { label: 'OPTIMAL', className: 'metric-grade-optimal', color: 'var(--accent-emerald)', fillClass: 'fill-emerald' };
+        if (val >= 0.70) return { label: 'STRONG', className: 'metric-grade-strong', color: 'var(--accent-cyan)', fillClass: 'fill-cyan' };
+        if (val >= 0.50) return { label: 'FAIR', className: 'metric-grade-fair', color: 'var(--accent-amber)', fillClass: 'fill-amber' };
+        return { label: 'POOR', className: 'metric-grade-poor', color: 'var(--accent-rose)', fillClass: 'fill-rose' };
+    }
+
+    function updateMetricGui(valElId, gradeElId, barElId, val, type = 'normal', format = '%') {
+        const valEl = document.getElementById(valElId);
+        const gradeEl = document.getElementById(gradeElId);
+        const barEl = document.getElementById(barElId);
+        const grade = getMetricGrade(val, type);
+
+        if (valEl) {
+            valEl.textContent = format === '%' ? `${(val * 100).toFixed(0)}%` : (format === 'dec%' ? `${(val * 100).toFixed(1)}%` : val.toFixed(2));
+            valEl.style.color = grade.color;
+        }
+        if (gradeEl) {
+            gradeEl.textContent = grade.label;
+            gradeEl.className = `metric-grade-pill ${grade.className}`;
+        }
+        if (barEl) {
+            const widthPct = type === 'hallucination' ? Math.max(5, (1.0 - val) * 100) : Math.min(100, Math.max(0, val * 100));
+            barEl.style.width = `${widthPct}%`;
+            barEl.className = `metric-progress-fill ${grade.fillClass}`;
+        }
+    }
+
+    // --- Floating Metric Formula Tooltip Popover ---
+    const tooltipEl = document.getElementById('metricFormulaTooltip');
+    let currentPinnedTarget = null;
+
+    function showMetricTooltip(metricKey, targetEl) {
+        if (!tooltipEl) return;
+        const info = METRIC_DEFINITIONS[metricKey];
+        if (!info) return;
+
+        tooltipEl.innerHTML = `
+            <div class="popover-header">
+                <div class="popover-title">
+                    <span>🧮</span>
+                    <span>${escapeHtml(info.title)}</span>
+                </div>
+                <span class="popover-category">${escapeHtml(info.category)}</span>
+            </div>
+            
+            <div class="popover-section-label">Mathematical Formula</div>
+            <div class="popover-formula-box">${escapeHtml(info.formula)}</div>
+            
+            <div class="popover-section-label">How It Is Calculated</div>
+            <ul class="popover-calc-list">
+                ${info.calculation.map(step => `<li>${escapeHtml(step)}</li>`).join('')}
+            </ul>
+            
+            <div class="popover-target-row">
+                <span>🎯 Target:</span>
+                <strong>${escapeHtml(info.target)}</strong>
+            </div>
+        `;
+
+        tooltipEl.style.display = 'block';
+        positionTooltip(targetEl);
+        // Force reflow for smooth animation
+        tooltipEl.offsetHeight;
+        tooltipEl.classList.add('visible');
+    }
+
+    function hideMetricTooltip() {
+        if (!tooltipEl || currentPinnedTarget) return;
+        tooltipEl.classList.remove('visible');
+        setTimeout(() => {
+            if (!tooltipEl.classList.contains('visible')) {
+                tooltipEl.style.display = 'none';
+            }
+        }, 200);
+    }
+
+    function positionTooltip(targetEl) {
+        if (!tooltipEl) return;
+        const rect = targetEl.getBoundingClientRect();
+        const tooltipWidth = 390;
+        const tooltipHeight = tooltipEl.offsetHeight || 230;
+        const padding = 14;
+
+        let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+        let top = rect.top - tooltipHeight - 10;
+
+        if (left < padding) left = padding;
+        if (left + tooltipWidth > window.innerWidth - padding) {
+            left = window.innerWidth - tooltipWidth - padding;
+        }
+
+        // Flip below if too close to viewport top
+        if (top < padding) {
+            top = rect.bottom + 10;
+        }
+
+        tooltipEl.style.left = `${Math.round(left)}px`;
+        tooltipEl.style.top = `${Math.round(top)}px`;
+    }
+
+    // Delegated hover & click triggers for metric formula tooltips
+    document.addEventListener('mouseover', (e) => {
+        if (currentPinnedTarget) return;
+        const metricCard = e.target.closest('[data-metric]');
+        if (metricCard) {
+            const key = metricCard.getAttribute('data-metric');
+            showMetricTooltip(key, metricCard);
+        }
+    });
+
+    document.addEventListener('mouseout', (e) => {
+        if (currentPinnedTarget) return;
+        const metricCard = e.target.closest('[data-metric]');
+        if (metricCard) {
+            if (e.relatedTarget && metricCard.contains(e.relatedTarget)) return;
+            hideMetricTooltip();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        const infoTrigger = e.target.closest('.metric-info-trigger');
+        const metricCard = e.target.closest('[data-metric]');
+
+        if (infoTrigger && metricCard) {
+            e.stopPropagation();
+            const key = metricCard.getAttribute('data-metric');
+            if (currentPinnedTarget === metricCard) {
+                currentPinnedTarget = null;
+                tooltipEl.classList.remove('pinned');
+                hideMetricTooltip();
+            } else {
+                currentPinnedTarget = metricCard;
+                showMetricTooltip(key, metricCard);
+                tooltipEl.classList.add('pinned');
+            }
+            return;
+        }
+
+        if (currentPinnedTarget && !e.target.closest('.metric-formula-popover')) {
+            currentPinnedTarget = null;
+            tooltipEl.classList.remove('pinned');
+            hideMetricTooltip();
+        }
+    });
+
+    // --- Benchmark Suite Runner Handler ---
     const btnRunBenchmark = document.getElementById('btnRunBenchmark');
     const benchmarkLoading = document.getElementById('benchmarkLoading');
     const benchmarkResults = document.getElementById('benchmarkResults');
@@ -516,40 +787,87 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch('/api/rag/evaluate/benchmark');
                 const report = await res.json();
 
-                // Populate scorecard
-                document.getElementById('metricOverallHealth').textContent = `${(report.overallPipelineHealthScore * 100).toFixed(1)}%`;
-                document.getElementById('metricHitRate').textContent = `${(report.averageHitRate * 100).toFixed(0)}%`;
-                document.getElementById('metricRecall').textContent = `${(report.averageRecallAtK * 100).toFixed(0)}%`;
-                document.getElementById('metricMRR').textContent = report.averageMRR.toFixed(2);
-                document.getElementById('metricContextRel').textContent = `${(report.averageContextRelevance * 100).toFixed(1)}%`;
+                // 1. Overall Pipeline Health Gauge
+                const healthScore = report.overallPipelineHealthScore || 0;
+                const healthEl = document.getElementById('metricOverallHealth');
+                const healthBar = document.getElementById('barOverallHealth');
+                const healthBadge = document.getElementById('healthStatusBadge');
 
-                document.getElementById('metricFaithfulness').textContent = `${(report.averageFaithfulness * 100).toFixed(0)}%`;
-                document.getElementById('metricAnswerRel').textContent = `${(report.averageAnswerRelevance * 100).toFixed(0)}%`;
-                document.getElementById('metricCitationPrec').textContent = `${(report.averageCitationPrecision * 100).toFixed(0)}%`;
-                const halloc = ((1.0 - report.averageFaithfulness) * 100).toFixed(1);
-                document.getElementById('metricHallucination').textContent = `${halloc}%`;
+                if (healthEl) healthEl.textContent = `${(healthScore * 100).toFixed(1)}%`;
+                if (healthBar) {
+                    healthBar.style.width = `${Math.min(100, Math.max(0, healthScore * 100)).toFixed(1)}%`;
+                    if (healthScore >= 0.75) healthBar.className = 'health-gauge-fill fill-emerald';
+                    else if (healthScore >= 0.50) healthBar.className = 'health-gauge-fill fill-cyan';
+                    else if (healthScore >= 0.35) healthBar.className = 'health-gauge-fill fill-amber';
+                    else healthBar.className = 'health-gauge-fill fill-rose';
+                }
+                if (healthBadge) {
+                    if (healthScore >= 0.80) {
+                        healthBadge.textContent = 'ENTERPRISE GRADE';
+                        healthBadge.className = 'badge success';
+                    } else if (healthScore >= 0.60) {
+                        healthBadge.textContent = 'PRODUCTION READY';
+                        healthBadge.className = 'badge cyan';
+                    } else if (healthScore >= 0.40) {
+                        healthBadge.textContent = 'NEEDS TUNING';
+                        healthBadge.className = 'badge amber';
+                    } else {
+                        healthBadge.textContent = 'DEGRADED';
+                        healthBadge.className = 'badge rose';
+                    }
+                }
 
-                // Render breakdown
+                // 2. Retrieval Metrics GUI Cards
+                updateMetricGui('metricHitRate', 'gradeHitRate', 'barHitRate', report.averageHitRate, 'normal', '%');
+                updateMetricGui('metricRecall', 'gradeRecall', 'barRecall', report.averageRecallAtK, 'normal', '%');
+                updateMetricGui('metricMRR', 'gradeMRR', 'barMRR', report.averageMRR, 'mrr', 'num');
+                updateMetricGui('metricContextRel', 'gradeContextRel', 'barContextRel', report.averageContextRelevance, 'normal', 'dec%');
+
+                // 3. Generation Metrics GUI Cards
+                updateMetricGui('metricFaithfulness', 'gradeFaithfulness', 'barFaithfulness', report.averageFaithfulness, 'normal', '%');
+                updateMetricGui('metricAnswerRel', 'gradeAnswerRel', 'barAnswerRel', report.averageAnswerRelevance, 'normal', '%');
+                updateMetricGui('metricCitationPrec', 'gradeCitationPrec', 'barCitationPrec', report.averageCitationPrecision, 'normal', '%');
+                const halloc = Math.max(0, 1.0 - report.averageFaithfulness);
+                updateMetricGui('metricHallucination', 'gradeHallucination', 'barHallucination', halloc, 'hallucination', 'dec%');
+
+                // 4. Render Breakdown Cards
                 const breakdownContainer = document.getElementById('benchmarkCaseBreakdown');
                 if (breakdownContainer && report.testSummaries) {
                     breakdownContainer.innerHTML = '';
                     report.testSummaries.forEach((s, idx) => {
-                        const div = document.createElement('div');
-                        div.style.background = 'rgba(10, 13, 20, 0.4)';
-                        div.style.border = '1px solid var(--border-color)';
-                        div.style.borderRadius = 'var(--radius-sm)';
-                        div.style.padding = '10px';
-                        div.style.fontSize = '0.78rem';
-                        div.innerHTML = `
-                            <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Q${idx + 1}: ${escapeHtml(s.query)}</div>
-                            <div style="display: flex; gap: 12px; color: var(--text-dim);">
-                                <span>Hit: <strong style="color: var(--accent-cyan);">${(s.hitRate * 100).toFixed(0)}%</strong></span>
-                                <span>MRR: <strong>${s.mrr.toFixed(2)}</strong></span>
-                                <span>Faithfulness: <strong style="color: var(--accent-emerald);">${(s.faithfulness * 100).toFixed(0)}%</strong></span>
-                                <span>Citation Prec: <strong>${(s.citationPrecision * 100).toFixed(0)}%</strong></span>
+                        const card = document.createElement('div');
+                        card.className = 'benchmark-query-card';
+                        const hitPassed = s.hitRate >= 0.99;
+                        card.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                                <div style="font-weight: 600; color: var(--text-main); font-size: 0.82rem;">
+                                    <span style="color: var(--accent-primary); margin-right: 6px;">Q${idx + 1}:</span>
+                                    ${escapeHtml(s.query)}
+                                </div>
+                                <span class="badge ${hitPassed ? 'success' : 'amber'}" style="font-size: 0.65rem; padding: 2px 7px;">
+                                    ${hitPassed ? 'HIT FOUND' : 'MISS'}
+                                </span>
+                            </div>
+                            <div class="query-metric-chips">
+                                <div class="query-chip">
+                                    <span style="color: var(--text-dim);">Hit:</span>
+                                    <strong style="color: var(--accent-cyan);">${(s.hitRate * 100).toFixed(0)}%</strong>
+                                </div>
+                                <div class="query-chip">
+                                    <span style="color: var(--text-dim);">MRR:</span>
+                                    <strong style="color: var(--text-main);">${s.mrr.toFixed(2)}</strong>
+                                </div>
+                                <div class="query-chip">
+                                    <span style="color: var(--text-dim);">Faithfulness:</span>
+                                    <strong style="color: var(--accent-emerald);">${(s.faithfulness * 100).toFixed(0)}%</strong>
+                                </div>
+                                <div class="query-chip">
+                                    <span style="color: var(--text-dim);">Citation Prec:</span>
+                                    <strong style="color: var(--accent-cyan);">${(s.citationPrecision * 100).toFixed(0)}%</strong>
+                                </div>
                             </div>
                         `;
-                        breakdownContainer.appendChild(div);
+                        breakdownContainer.appendChild(card);
                     });
                 }
 
@@ -565,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Custom Query Evaluator ---
+    // --- Custom Query Evaluator GUI Handler with Mouseover Formula Support ---
     const btnRunCustomEval = document.getElementById('btnRunCustomEval');
     const customEvalResult = document.getElementById('customEvalResult');
     if (btnRunCustomEval) {
@@ -596,17 +914,112 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const retData = await res.json();
                 if (customEvalResult) {
+                    const hitGrade = getMetricGrade(retData.hitRate, 'normal');
+                    const precGrade = getMetricGrade(retData.precisionAtK, 'normal');
+                    const mrrGrade = getMetricGrade(retData.mrr, 'mrr');
+                    const relGrade = getMetricGrade(retData.contextRelevanceScore, 'normal');
+
+                    const sourcePillsHtml = (retData.retrievedSources && retData.retrievedSources.length > 0)
+                        ? retData.retrievedSources.map(s => `<span class="source-tag">📄 ${escapeHtml(s)}</span>`).join('')
+                        : '<span style="color: var(--text-dim); font-size: 0.75rem;">No sources retrieved above threshold</span>';
+
                     customEvalResult.innerHTML = `
-                        <div style="background: rgba(10, 13, 20, 0.5); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px;">
-                            <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 6px;">Retrieval Evaluation Results:</div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.8rem;">
-                                <div>Hit Rate: <strong>${(retData.hitRate * 100).toFixed(0)}%</strong></div>
-                                <div>MRR: <strong>${retData.mrr.toFixed(2)}</strong></div>
-                                <div>Precision@K: <strong>${(retData.precisionAtK * 100).toFixed(0)}%</strong></div>
-                                <div>Context Relevance: <strong>${(retData.contextRelevanceScore * 100).toFixed(1)}%</strong></div>
+                        <div style="background: rgba(17, 22, 34, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                                <div style="font-weight: 700; color: var(--accent-cyan); font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">
+                                    <span>🎯</span> Retrieval Evaluation Results
+                                </div>
+                                <span class="badge ${retData.hitRate >= 0.8 ? 'success' : 'amber'}" style="font-size: 0.72rem; padding: 3px 8px;">
+                                    ${retData.hitRate >= 0.8 ? 'PASSED RETRIEVAL' : 'LOW RECALL'}
+                                </span>
                             </div>
-                            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 6px;">
-                                Retrieved Sources: ${retData.retrievedSources.join(', ') || 'None'}
+
+                            <div class="metrics-grid">
+                                <!-- Hit Rate Card -->
+                                <div class="metric-row-card" data-metric="hitRate">
+                                    <div class="metric-header-row">
+                                        <div class="metric-label-group">
+                                            <span class="metric-icon">🎯</span>
+                                            <span>Hit Rate</span>
+                                            <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                        </div>
+                                        <div class="metric-val-pill">
+                                            <span class="metric-val-num" style="color: ${hitGrade.color};">${(retData.hitRate * 100).toFixed(0)}%</span>
+                                            <span class="metric-grade-pill ${hitGrade.className}">${hitGrade.label}</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-progress-track">
+                                        <div class="metric-progress-fill ${hitGrade.fillClass}" style="width: ${(retData.hitRate * 100).toFixed(0)}%;"></div>
+                                    </div>
+                                    <div class="metric-desc">Expected keywords found within top-K retrieved context chunks</div>
+                                </div>
+
+                                <!-- Precision@K Card -->
+                                <div class="metric-row-card" data-metric="precisionAtK">
+                                    <div class="metric-header-row">
+                                        <div class="metric-label-group">
+                                            <span class="metric-icon">📥</span>
+                                            <span>Precision@K</span>
+                                            <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                        </div>
+                                        <div class="metric-val-pill">
+                                            <span class="metric-val-num" style="color: ${precGrade.color};">${(retData.precisionAtK * 100).toFixed(0)}%</span>
+                                            <span class="metric-grade-pill ${precGrade.className}">${precGrade.label}</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-progress-track">
+                                        <div class="metric-progress-fill ${precGrade.fillClass}" style="width: ${(retData.precisionAtK * 100).toFixed(0)}%;"></div>
+                                    </div>
+                                    <div class="metric-desc">Proportion of top-K chunks that contain required reference terms</div>
+                                </div>
+
+                                <!-- MRR Card -->
+                                <div class="metric-row-card" data-metric="mrr">
+                                    <div class="metric-header-row">
+                                        <div class="metric-label-group">
+                                            <span class="metric-icon">🥇</span>
+                                            <span>Mean Reciprocal Rank (MRR)</span>
+                                            <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                        </div>
+                                        <div class="metric-val-pill">
+                                            <span class="metric-val-num" style="color: ${mrrGrade.color};">${retData.mrr.toFixed(2)}</span>
+                                            <span class="metric-grade-pill ${mrrGrade.className}">${mrrGrade.label}</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-progress-track">
+                                        <div class="metric-progress-fill ${mrrGrade.fillClass}" style="width: ${Math.min(100, retData.mrr * 100).toFixed(0)}%;"></div>
+                                    </div>
+                                    <div class="metric-desc">Positional reciprocal of first relevant chunk (1.00 = 1st rank)</div>
+                                </div>
+
+                                <!-- Context Relevance Card -->
+                                <div class="metric-row-card" data-metric="contextRel">
+                                    <div class="metric-header-row">
+                                        <div class="metric-label-group">
+                                            <span class="metric-icon">📑</span>
+                                            <span>Context Relevance</span>
+                                            <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                        </div>
+                                        <div class="metric-val-pill">
+                                            <span class="metric-val-num" style="color: ${relGrade.color};">${(retData.contextRelevanceScore * 100).toFixed(1)}%</span>
+                                            <span class="metric-grade-pill ${relGrade.className}">${relGrade.label}</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-progress-track">
+                                        <div class="metric-progress-fill ${relGrade.fillClass}" style="width: ${(retData.contextRelevanceScore * 100).toFixed(0)}%;"></div>
+                                    </div>
+                                    <div class="metric-desc">Query term density and topical overlap in retrieved chunks</div>
+                                </div>
+                            </div>
+
+                            <!-- Retrieved Sources -->
+                            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+                                <div style="font-size: 0.72rem; color: var(--text-dim); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+                                    Retrieved Document Sources (${retData.retrievedSources ? retData.retrievedSources.length : 0})
+                                </div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                    ${sourcePillsHtml}
+                                </div>
                             </div>
                         </div>
                     `;

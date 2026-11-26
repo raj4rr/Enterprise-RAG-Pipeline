@@ -313,71 +313,205 @@
                     </div>
 
                     <div id="benchmarkResults" style="display: none;">
-                        <!-- Overall Pipeline Health Gauge -->
-                        <div style="background: rgba(10, 13, 20, 0.5); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
-                            <div>
-                                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.05em;">Overall RAG Pipeline Health</div>
-                                <div style="font-size: 1.8rem; font-weight: 800; color: var(--accent-emerald);" id="metricOverallHealth">94.2%</div>
+                        <!-- Overall Pipeline Health GUI Gauge Card -->
+                        <div class="health-gauge-card" data-metric="overallHealth">
+                            <div class="health-gauge-header">
+                                <div>
+                                    <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.06em; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                                        <span>Composite RAG Pipeline Health</span>
+                                        <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                    </div>
+                                    <div style="font-size: 1.85rem; font-weight: 800; color: var(--accent-emerald);" id="metricOverallHealth">0.0%</div>
+                                </div>
+                                <div id="healthStatusBadge" class="badge success" style="font-size: 0.8rem; padding: 4px 10px;">ENTERPRISE GRADE</div>
                             </div>
-                            <div class="badge success" style="font-size: 0.85rem;" id="healthStatusBadge">ENTERPRISE GRADE</div>
+                            <div class="health-gauge-track">
+                                <div id="barOverallHealth" class="health-gauge-fill fill-emerald" style="width: 0%;"></div>
+                            </div>
+                            <div style="font-size: 0.7rem; color: var(--text-dim);">Composite score across 8 decoupled retrieval & generation quality dimensions (Hover for formula)</div>
                         </div>
 
-                        <!-- 2-Column Metrics Scorecard -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                        <!-- 2-Column Metrics Scorecard with Dedicated GUI Cards -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
                             <!-- Retrieval Metrics Column -->
-                            <div style="background: rgba(17, 22, 34, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
-                                <h4 style="color: var(--accent-cyan); font-size: 0.85rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-                                    <span>🔍</span> Retrieval Metrics
+                            <div style="background: rgba(17, 22, 34, 0.5); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+                                <h4 style="color: var(--accent-cyan); font-size: 0.85rem; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="display: flex; align-items: center; gap: 6px;"><span>🔍</span> Retrieval Metrics</span>
+                                    <span style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">Search Precision & Recall</span>
                                 </h4>
-                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem;">
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span style="color: var(--text-muted);">Hit Rate:</span>
-                                        <strong style="color: var(--text-main);" id="metricHitRate">100%</strong>
+                                
+                                <div class="metrics-grid">
+                                    <!-- Hit Rate GUI Card -->
+                                    <div class="metric-row-card" data-metric="hitRate">
+                                        <div class="metric-header-row">
+                                            <div class="metric-label-group">
+                                                <span class="metric-icon">🎯</span>
+                                                <span>Hit Rate</span>
+                                                <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                            </div>
+                                            <div class="metric-val-pill">
+                                                <span class="metric-val-num" id="metricHitRate" style="color: var(--accent-cyan);">0%</span>
+                                                <span class="metric-grade-pill metric-grade-optimal" id="gradeHitRate">OPTIMAL</span>
+                                            </div>
+                                        </div>
+                                        <div class="metric-progress-track">
+                                            <div class="metric-progress-fill fill-cyan" id="barHitRate" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="metric-desc">Percentage of queries where target context is retrieved in top-K</div>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span style="color: var(--text-muted);">Recall@K:</span>
-                                        <strong style="color: var(--text-main);" id="metricRecall">100%</strong>
+
+                                    <!-- Recall@K GUI Card -->
+                                    <div class="metric-row-card" data-metric="recall">
+                                        <div class="metric-header-row">
+                                            <div class="metric-label-group">
+                                                <span class="metric-icon">📥</span>
+                                                <span>Recall@K</span>
+                                                <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                            </div>
+                                            <div class="metric-val-pill">
+                                                <span class="metric-val-num" id="metricRecall" style="color: var(--accent-cyan);">0%</span>
+                                                <span class="metric-grade-pill metric-grade-optimal" id="gradeRecall">OPTIMAL</span>
+                                            </div>
+                                        </div>
+                                        <div class="metric-progress-track">
+                                            <div class="metric-progress-fill fill-cyan" id="barRecall" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="metric-desc">Proportion of all relevant ground-truth chunks captured</div>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span style="color: var(--text-muted);">Mean Reciprocal Rank (MRR):</span>
-                                        <strong style="color: var(--text-main);" id="metricMRR">1.00</strong>
+
+                                    <!-- MRR GUI Card -->
+                                    <div class="metric-row-card" data-metric="mrr">
+                                        <div class="metric-header-row">
+                                            <div class="metric-label-group">
+                                                <span class="metric-icon">🥇</span>
+                                                <span>Mean Reciprocal Rank (MRR)</span>
+                                                <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                            </div>
+                                            <div class="metric-val-pill">
+                                                <span class="metric-val-num" id="metricMRR" style="color: var(--text-main);">0.00</span>
+                                                <span class="metric-grade-pill metric-grade-optimal" id="gradeMRR">1st RANK</span>
+                                            </div>
+                                        </div>
+                                        <div class="metric-progress-track">
+                                            <div class="metric-progress-fill fill-emerald" id="barMRR" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="metric-desc">Average reciprocal position (1/Rank) of first matching source</div>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span style="color: var(--text-muted);">Context Relevance:</span>
-                                        <strong style="color: var(--text-main);" id="metricContextRel">88.5%</strong>
+
+                                    <!-- Context Relevance GUI Card -->
+                                    <div class="metric-row-card" data-metric="contextRel">
+                                        <div class="metric-header-row">
+                                            <div class="metric-label-group">
+                                                <span class="metric-icon">📑</span>
+                                                <span>Context Relevance</span>
+                                                <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                            </div>
+                                            <div class="metric-val-pill">
+                                                <span class="metric-val-num" id="metricContextRel" style="color: var(--text-main);">0.0%</span>
+                                                <span class="metric-grade-pill metric-grade-strong" id="gradeContextRel">STRONG</span>
+                                            </div>
+                                        </div>
+                                        <div class="metric-progress-track">
+                                            <div class="metric-progress-fill fill-cyan" id="barContextRel" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="metric-desc">Signal-to-noise density of query concepts in retrieved chunks</div>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Generation Metrics Column -->
-                            <div style="background: rgba(17, 22, 34, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
-                                <h4 style="color: var(--accent-emerald); font-size: 0.85rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-                                    <span>✍️</span> Generation Metrics
+                            <div style="background: rgba(17, 22, 34, 0.5); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+                                <h4 style="color: var(--accent-emerald); font-size: 0.85rem; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="display: flex; align-items: center; gap: 6px;"><span>✍️</span> Generation Metrics</span>
+                                    <span style="font-size: 0.7rem; color: var(--text-dim); font-weight: 400;">Factuality & Citations</span>
                                 </h4>
-                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem;">
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span style="color: var(--text-muted);">Faithfulness / Grounding:</span>
-                                        <strong style="color: var(--accent-emerald);" id="metricFaithfulness">100%</strong>
+                                
+                                <div class="metrics-grid">
+                                    <!-- Faithfulness / Grounding GUI Card -->
+                                    <div class="metric-row-card" data-metric="faithfulness">
+                                        <div class="metric-header-row">
+                                            <div class="metric-label-group">
+                                                <span class="metric-icon">🛡️</span>
+                                                <span>Faithfulness / Grounding</span>
+                                                <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                            </div>
+                                            <div class="metric-val-pill">
+                                                <span class="metric-val-num" id="metricFaithfulness" style="color: var(--accent-emerald);">0%</span>
+                                                <span class="metric-grade-pill metric-grade-optimal" id="gradeFaithfulness">GROUNDED</span>
+                                            </div>
+                                        </div>
+                                        <div class="metric-progress-track">
+                                            <div class="metric-progress-fill fill-emerald" id="barFaithfulness" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="metric-desc">Ratio of generated claims directly supported by retrieved text</div>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span style="color: var(--text-muted);">Answer Relevance:</span>
-                                        <strong style="color: var(--text-main);" id="metricAnswerRel">92.0%</strong>
+
+                                    <!-- Answer Relevance GUI Card -->
+                                    <div class="metric-row-card" data-metric="answerRel">
+                                        <div class="metric-header-row">
+                                            <div class="metric-label-group">
+                                                <span class="metric-icon">💬</span>
+                                                <span>Answer Relevance</span>
+                                                <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                            </div>
+                                            <div class="metric-val-pill">
+                                                <span class="metric-val-num" id="metricAnswerRel" style="color: var(--text-main);">0%</span>
+                                                <span class="metric-grade-pill metric-grade-strong" id="gradeAnswerRel">STRONG</span>
+                                            </div>
+                                        </div>
+                                        <div class="metric-progress-track">
+                                            <div class="metric-progress-fill fill-cyan" id="barAnswerRel" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="metric-desc">Semantic alignment between LLM completion and user prompt</div>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span style="color: var(--text-muted);">Citation Precision:</span>
-                                        <strong style="color: var(--accent-cyan);" id="metricCitationPrec">100%</strong>
+
+                                    <!-- Citation Precision GUI Card -->
+                                    <div class="metric-row-card" data-metric="citationPrec">
+                                        <div class="metric-header-row">
+                                            <div class="metric-label-group">
+                                                <span class="metric-icon">🏷️</span>
+                                                <span>Citation Precision</span>
+                                                <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                            </div>
+                                            <div class="metric-val-pill">
+                                                <span class="metric-val-num" id="metricCitationPrec" style="color: var(--accent-cyan);">0%</span>
+                                                <span class="metric-grade-pill metric-grade-optimal" id="gradeCitationPrec">VERIFIED</span>
+                                            </div>
+                                        </div>
+                                        <div class="metric-progress-track">
+                                            <div class="metric-progress-fill fill-cyan" id="barCitationPrec" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="metric-desc">Ratio of inline citations pointing to valid retrieved chunk IDs</div>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span style="color: var(--text-muted);">Hallucination Rate:</span>
-                                        <strong style="color: var(--accent-emerald);" id="metricHallucination">0.0%</strong>
+
+                                    <!-- Hallucination Rate GUI Card -->
+                                    <div class="metric-row-card" data-metric="hallucination">
+                                        <div class="metric-header-row">
+                                            <div class="metric-label-group">
+                                                <span class="metric-icon">⚡</span>
+                                                <span>Hallucination Rate</span>
+                                                <span class="metric-info-trigger" title="Hover to view formula">ℹ️</span>
+                                            </div>
+                                            <div class="metric-val-pill">
+                                                <span class="metric-val-num" id="metricHallucination" style="color: var(--accent-emerald);">0.0%</span>
+                                                <span class="metric-grade-pill metric-grade-optimal" id="gradeHallucination">ZERO RISK</span>
+                                            </div>
+                                        </div>
+                                        <div class="metric-progress-track">
+                                            <div class="metric-progress-fill fill-emerald" id="barHallucination" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="metric-desc">Inverted risk score (1.0 - Faithfulness; lower is safer)</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Per-query details table -->
-                        <h4 style="font-size: 0.85rem; margin-bottom: 8px; color: var(--text-muted);">Benchmark Query Breakdown:</h4>
-                        <div id="benchmarkCaseBreakdown" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;"></div>
+                        <h4 style="font-size: 0.85rem; margin-bottom: 8px; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between;">
+                            <span>Benchmark Query Breakdown</span>
+                            <span style="font-size: 0.72rem; color: var(--text-dim); font-weight: normal;">Click any test case to inspect grounding details</span>
+                        </h4>
+                        <div id="benchmarkCaseBreakdown" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto;"></div>
                     </div>
 
                     <div id="benchmarkEmptyPrompt" style="text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 0.85rem;">
@@ -396,12 +530,12 @@
 
                     <div class="form-group">
                         <label class="form-label">Test Query</label>
-                        <input type="text" id="evalCustomQuery" placeholder="e.g. How does sliding-window chunk overlap preserve context?">
+                        <input type="text" id="evalCustomQuery" value="Why does sliding-window chunk overlap matter?" placeholder="e.g. How does sliding-window chunk overlap preserve context?">
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Expected Keywords (comma-separated)</label>
-                        <input type="text" id="evalCustomKeywords" placeholder="e.g. sliding, overlap, context, boundary">
+                        <input type="text" id="evalCustomKeywords" value="sliding, overlap, context, boundary" placeholder="e.g. sliding, overlap, context, boundary">
                     </div>
 
                     <button class="btn btn-secondary" id="btnRunCustomEval" style="width: 100%;">Evaluate Retrieval & Context</button>
@@ -411,6 +545,9 @@
             </div>
         </section>
     </main>
+
+    <!-- Global Floating Formula & Calculation Popover -->
+    <div id="metricFormulaTooltip" class="metric-formula-popover" style="display: none;"></div>
 
     <script src="/js/app.js"></script>
 </body>
